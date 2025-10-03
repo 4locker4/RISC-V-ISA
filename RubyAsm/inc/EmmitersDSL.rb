@@ -1,0 +1,251 @@
+# TD добавить в emit_xxx_type проверку, что нет взаимодействия с нулевым регистром
+# TD добавить обработку 31го регистра РС
+
+# =+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=  ADDRESS FOR OFFSET.BASE =+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+= 
+class Address
+    attr_reader :offset, :base
+  
+    def initialize(offset, base)
+        @offset = offset
+        @base   = base
+    end
+end
+
+# =+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+= EXTENDING INTEGER FOR SYNTAX: 8.x3 =+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+class Integer
+    def method_missing(name, *args)
+        if args.empty? && name.to_s.match?(/^x(\d+)$/)
+            reg_num = Regexp.last_match(1).to_i
+            return Address.new(self, reg_num) if (0..31).include?(reg_num)
+        end
+
+        super
+    end
+  
+    def respond_to_missing?(name, include_private = false)
+        name.to_s.match?(/^x\d+$/) || super
+    end
+end
+
+# +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+= START ASSEMBLER =+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+++=+=+=
+class Assembler
+    attr_reader :code
+
+    def initialize
+        @code = ''.b
+
+        (0..31).each do |i|                                 # Creating registers
+            self.class.send(:define_method, "x#{i}") { i }
+        end
+    end
+
+    INSTRUCTIONS = {
+        # r-types instructions
+        add:  { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b011010) } },
+        sub:  { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b011111) } },
+        movz: { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b000100) } },
+        selc: { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b000011) } },
+        rbit: { proc: ->(rd, rs)     { emit_r_type(rd, rs, 0,  0b011101) } },  # rt = 0
+    
+        # i-types instructions
+        st:   { proc: ->(rt,  addr)         { emit_i_type_ld_st     (rt,  addr,         0b100101) } },
+        stp:  { proc: ->(rt1, rt2, addr)    { emit_i_stp            (rt1, rt2,  addr,   0b111001) } },
+        beq:  { proc: ->(rs,  rt,  offset)  { emit_i_beq            (rs,  rt,   offset, 0b010011) } },
+        slti: { proc: ->(rs,  rt,  imm)     { emit_i_type_slti      (rs,  rt,   imm,    0b111011) } },
+        usat: { proc: ->(rd,  rs,  imm5)    { emit_i_type_rori_usat (rd,  rs,   imm5,   0b100010) } },
+        ld:   { proc: ->(rt,  addr)         { emit_i_type_ld_st     (rt,  addr,         0b100011) } },
+        rori: { proc: ->(rd,  rs,  imm5)    { emit_i_type_rori_usat (rd,  rs,   imm5,   0b001100) } },
+    
+        # j-types instructions
+        j:    { proc: ->(addr) { emit_j_type(addr, 0b010110) } },
+    
+        # syscall
+        syscall: { proc: ->() { emit_r_type(0, 0, 0, 0b011001) } }
+    }.freeze
+
+#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+= START EMMITERS +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
+    def emit_r_type(rd, rs, rt, funct)
+        validate_reg(rd)
+        validate_reg(rs)
+        validate_reg(rt) if rt != 0
+      
+        instr = (
+            (0 << 26)  |      # funct
+            (rs << 21) |      # rs
+            (rt << 16) |      # rt (может быть 0)
+            (rd << 11) |      # rd
+            (0 << 6)   |      # shamt = 0
+            funct             # funct
+        )
+      
+        [instr].pack('N')
+    end
+
+    def emit_i_beq(rs, rt, offset, opcode)
+        validate_reg(rd)
+        validate_reg(rs)
+        unless offset % 4 == 0
+            raise ArgumentError, "BEQ offset must be word-aligned (multiple of 4), got #{offset}"
+        end
+        
+        imm16 = encode_immediate(offset / 4, 16, signed: true)
+
+    # Create binary
+        instr = (
+        (opcode << 26) |        # opcode
+        (rs     << 21) |        # rs
+        (rt     << 16) |        # rt
+        (imm16 & 0xFFFF)        # offset
+        )
+
+        [instr].pack('N')
+    end
+
+    def emit_i_stp(rt1, rt2, address, opcode)
+        validate_reg(rt1)
+        validate_reg(rt2)
+        validate_reg(address.base)
+
+        imm11 = encode_immediate(address.offset, 11, signed: true)
+
+    # Create binary
+        instr = (
+            (opcode << 26)       |  # opcode
+            (address.base << 21) |  # base reg
+            (rt1 << 16)          |  # rt1
+            (rt2 << 11)          |  # rt2
+            (imm11 & 0x7FF)         # offset
+        )
+
+        [instr].pack('N')
+
+    end
+
+    def emit_i_type_ld_st(rt, address, opcode)
+        validate_reg(rt)
+        validate_reg(address.base)
+      
+        unless address.offset % 4 == 0
+            raise ArgumentError, "Offset must be word-aligned (multiple of 4), got #{address.offset}"
+        end
+      
+        imm16 = encode_immediate(address.offset, 16, signed: true)
+      
+    # Create binary
+        instr = (
+            (opcode << 26)       |
+            (address.base << 21) |
+            (rt << 16)           |
+            (imm16 & 0xFFFF)
+        )
+      
+        [instr].pack('N')
+    end
+
+    def emit_i_type_slti(rs, rt, imm, opcode)
+        validate_reg(rs)
+        validate_reg(rt)
+        imm16 = encode_immediate(imm, 16, signed: true)
+      
+    # Create binary
+    instr = (
+            (opcode << 26)  |
+            (rs << 21)      |
+            (rt << 16)      |
+            (imm16 & 0xFFFF)
+        )   
+      
+        [instr].pack('N')
+    end
+    
+    def emit_i_type_rori_usat(rd, rs, imm5, opcode)
+        validate_reg(rd)
+        validate_reg(rs)
+      
+        if imm5 < 0 || imm5 > 31
+            raise ArgumentError, "Imm5 must be 0..31, got #{imm5}"
+        end
+      
+    # Create binary
+        instr = (
+            (opcode << 26)  |
+            (rd << 21)      |
+            (rs << 16)      |
+            (imm5 << 11)    |
+            0               # Zeros!
+        )
+      
+        [instr].pack('N')
+    end
+
+    def emit_j_type(address, opcode)
+        unless address % 4 == 0
+            raise ArgumentError, "J target must be word-aligned (multiple of 4), got #{address}"
+        end
+      
+        imm26 = encode_immediate(address >> 2, 26, signed: false)  # A total of 26 bits are allocated
+                                                                   # to the address, but the last 2 are 0
+    # Create binary
+        instr = (opcode << 26) |    # opcode
+                (imm26 & 0x3FFFFFF) # address
+
+        [instr].pack('N')
+    end
+
+    def emit_syscall(opcode)
+        [opcode].pack('N')          # Create binary
+    end
+#+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+= START SUPPORTING FUNCTS +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
+    private
+
+# Checking validity of num
+    def encode_immediate(num, bits, signed: false)
+        mask = (1 << bits) - 1                      # In max pos there is sign bit
+        if signed
+            max_pos = (1 << (bits - 1)) - 1         # Max 2 ^ (bits - 1) - 1, because of interp
+            min_neg = -(1 << (bits - 1))            # Max neg 2 ^ (bits - 1)
+            unless (min_neg..max_pos).include?(num)
+                raise ArgumentError, "Immediate #{num} out of range for #{bits}-bit signed"
+            end
+            num & mask
+        else
+            unless (0..mask).include?(num)
+                raise ArgumentError, "Immediate #{num} out of range for #{bits}-bit unsigned"
+            end
+            num
+        end
+    end
+
+# Checking validity of register
+    def validate_reg(r)
+        raise ArgumentError, "Register must be 0..31, got #{r}"unless r.is_a?(Integer) && (0..31).include?(r)
+    end
+
+#+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+= DISPATCHER +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+    def method_missing(name, *args)
+        instr = INSTRUCTIONS[name]
+        if instr
+            begin
+                instr[:proc].call(*args)
+            rescue ArgumentError => e
+                raise ArgumentError, "#{name} failed: #{e.message}"
+            end
+        else
+            super
+        end
+    end
+
+    def respond_to_missing?(name, include_private = false)
+        INSTRUCTIONS.key?(name) || super
+    end
+end
+
+#+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+= WRAPPING +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
+def assemble(&block)
+    asm = Assembler.new
+    asm.instance_eval(&block)
+    asm.code
+end    
