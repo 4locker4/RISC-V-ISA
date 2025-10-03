@@ -12,8 +12,10 @@ binary = assemble do
     usat x11, x12, 8
     ld x13, 12.x14
     rori x15, x16, 5
-    syscall
+    #syscall
   end
   
-  puts "Binary:"
-  puts binary.inspect
+  output_file = "./RubyAsm/outp.bin"
+  File.open(output_file, 'wb') do |f|
+    f.write(binary)
+  end

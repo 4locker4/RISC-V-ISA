@@ -39,31 +39,31 @@ class Assembler
         end
     end
 
+#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+= START EMMITERS +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
     INSTRUCTIONS = {
         # r-types instructions
-        add:  { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b011010) } },
-        sub:  { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b011111) } },
+        add: { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b011010) } },
+        sub: { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b011111) } },
         movz: { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b000100) } },
         selc: { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b000011) } },
-        rbit: { proc: ->(rd, rs)     { emit_r_type(rd, rs, 0,  0b011101) } },  # rt = 0
-    
-        # i-types instructions
-        st:   { proc: ->(rt,  addr)         { emit_i_type_ld_st     (rt,  addr,         0b100101) } },
-        stp:  { proc: ->(rt1, rt2, addr)    { emit_i_stp            (rt1, rt2,  addr,   0b111001) } },
-        beq:  { proc: ->(rs,  rt,  offset)  { emit_i_beq            (rs,  rt,   offset, 0b010011) } },
-        slti: { proc: ->(rs,  rt,  imm)     { emit_i_type_slti      (rs,  rt,   imm,    0b111011) } },
-        usat: { proc: ->(rd,  rs,  imm5)    { emit_i_type_rori_usat (rd,  rs,   imm5,   0b100010) } },
-        ld:   { proc: ->(rt,  addr)         { emit_i_type_ld_st     (rt,  addr,         0b100011) } },
-        rori: { proc: ->(rd,  rs,  imm5)    { emit_i_type_rori_usat (rd,  rs,   imm5,   0b001100) } },
-    
-        # j-types instructions
-        j:    { proc: ->(addr) { emit_j_type(addr, 0b010110) } },
-    
-        # syscall
-        syscall: { proc: ->() { emit_r_type(0, 0, 0, 0b011001) } }
-    }.freeze
+        rbit: { proc: ->(rd, rs) { emit_r_type(rd, rs, 0, 0b011101) } },
 
-#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+= START EMMITERS +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+        # i-types instructions
+        st: { proc: ->(rt, addr) { emit_i_type_ld_st(rt, addr, 0b100101) } },
+        stp: { proc: ->(rt1, rt2, addr) { emit_i_stp(rt1, rt2, addr, 0b111001) } },
+        beq: { proc: ->(rs, rt, offset) { emit_i_beq(rs, rt, offset, 0b010011) } },
+        slti: { proc: ->(rs, rt, imm) { emit_i_type_slti(rs, rt, imm, 0b111011) } },
+        usat: { proc: ->(rd, rs, imm5) { emit_i_type_rori_usat(rd, rs, imm5, 0b100010) } },
+        ld: { proc: ->(rt, addr) { emit_i_type_ld_st(rt, addr, 0b100011) } },
+        rori: { proc: ->(rd, rs, imm5) { emit_i_type_rori_usat(rd, rs, imm5, 0b001100) } },
+
+        # j-types instructions
+        j: { proc: ->(addr) { emit_j_type(addr, 0b010110) } },
+
+        # syscall
+        syscall: { proc: -> { emit_r_type(0, 0, 0, 0b011001) } }
+    }.freeze
 
     def emit_r_type(rd, rs, rt, funct)
         validate_reg(rd)
@@ -78,12 +78,21 @@ class Assembler
             (0 << 6)   |      # shamt = 0
             funct             # funct
         )
-      
+        
+        puts "R-Type Instruction:"
+        puts "funct:     #{funct.to_s(2).rjust(6, '0')} (#{funct})"
+        puts "rs:        #{rs.to_s(2).rjust(5, '0')} (#{rs})"
+        puts "rt:        #{rt.to_s(2).rjust(5, '0')} (#{rt})"
+        puts "rd:        #{rd.to_s(2).rjust(5, '0')} (#{rd})"
+        puts "bytes:     #{[instr].pack('N').bytes.map { |b| "%08b" % b }.join(' ')}"
+        puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
+        puts "-" * 40
+
         [instr].pack('N')
     end
 
     def emit_i_beq(rs, rt, offset, opcode)
-        validate_reg(rd)
+        validate_reg(rt)
         validate_reg(rs)
         unless offset % 4 == 0
             raise ArgumentError, "BEQ offset must be word-aligned (multiple of 4), got #{offset}"
@@ -98,6 +107,15 @@ class Assembler
         (rt     << 16) |        # rt
         (imm16 & 0xFFFF)        # offset
         )
+
+        puts "I-Type Instruction BEQ:"
+        puts "opcode:    #{opcode.to_s(2).rjust(6, '0')} (#{opcode})"
+        puts "rs:        #{rs.to_s(2).rjust(5, '0')} (#{rs})"
+        puts "rt:        #{rt.to_s(2).rjust(5, '0')} (#{rt})"
+        puts "imm16:     #{imm16.to_s(2).rjust(16, '0')} (#{imm16})"
+        puts "bytes:     #{[instr].pack('N').bytes.map { |b| "%08b" % b }.join(' ')}"
+        puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
+        puts "-" * 40
 
         [instr].pack('N')
     end
@@ -117,6 +135,16 @@ class Assembler
             (rt2 << 11)          |  # rt2
             (imm11 & 0x7FF)         # offset
         )
+
+        puts "I-Type Instruction STP:"
+        puts "opcode:    #{opcode.to_s(2).rjust(6, '0')} (#{opcode})"
+        puts "addr.base: #{address.base.to_s(2).rjust(5, '0')} (#{address.base})"
+        puts "rt1:       #{rt1.to_s(2).rjust(5, '0')} (#{rt1})"
+        puts "rt2:       #{rt2.to_s(2).rjust(5, '0')} (#{rt2})"
+        puts "imm11:     #{imm11.to_s(2).rjust(11, '0')} (#{imm11})"
+        puts "bytes:     #{[instr].pack('N').bytes.map { |b| "%08b" % b }.join(' ')}"
+        puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
+        puts "-" * 40
 
         [instr].pack('N')
 
@@ -139,6 +167,15 @@ class Assembler
             (rt << 16)           |
             (imm16 & 0xFFFF)
         )
+
+        puts "I-Type Instruction SLTI:"
+        puts "opcode:    #{opcode.to_s(2).rjust(6, '0')} (#{opcode})"
+        puts "addr.base: #{address.base.to_s(2).rjust(5, '0')} (#{address.base})"
+        puts "rt:        #{rt.to_s(2).rjust(5, '0')} (#{rt})"
+        puts "imm16:     #{imm16.to_s(2).rjust(16, '0')} (#{imm16})"
+        puts "bytes:     #{[instr].pack('N').bytes.map { |b| "%08b" % b }.join(' ')}"
+        puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
+        puts "-" * 40
       
         [instr].pack('N')
     end
@@ -155,6 +192,15 @@ class Assembler
             (rt << 16)      |
             (imm16 & 0xFFFF)
         )   
+
+        puts "I-Type Instruction SLTI:"
+        puts "opcode:    #{opcode.to_s(2).rjust(6, '0')} (#{opcode})"
+        puts "rs:        #{rs.to_s(2).rjust(5, '0')} (#{rs})"
+        puts "rt:        #{rt.to_s(2).rjust(5, '0')} (#{rt})"
+        puts "imm16:     #{imm16.to_s(2).rjust(16, '0')} (#{imm16})"
+        puts "bytes:     #{[instr].pack('N').bytes.map { |b| "%08b" % b }.join(' ')}"
+        puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
+        puts "-" * 40
       
         [instr].pack('N')
     end
@@ -176,6 +222,15 @@ class Assembler
             0               # Zeros!
         )
       
+        puts "I-Type Instruction rori or usat:"
+        puts "opcode:    #{opcode.to_s(2).rjust(6, '0')} (#{opcode})"
+        puts "rd:        #{rd.to_s(2).rjust(5, '0')} (#{rd})"
+        puts "rs:        #{rs.to_s(2).rjust(5, '0')} (#{rs})"
+        puts "imm5:      #{imm5.to_s(2).rjust(5, '0')} (#{imm5})"
+        puts "bytes:     #{[instr].pack('N').bytes.map { |b| "%08b" % b }.join(' ')}"
+        puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
+        puts "-" * 40
+
         [instr].pack('N')
     end
 
@@ -190,7 +245,15 @@ class Assembler
         instr = (opcode << 26) |    # opcode
                 (imm26 & 0x3FFFFFF) # address
 
+        puts "J-Type Instruction:"
+        puts "opcode:    #{opcode.to_s(2).rjust(6, '0')} (#{opcode})"
+        puts "imm26:     #{imm26.to_s(2).rjust(26, '0')} (#{imm26})"
+        puts "bytes:     #{[instr].pack('N').bytes.map { |b| "%08b" % b }.join(' ')}"
+        puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
+        puts "-" * 40
+
         [instr].pack('N')
+
     end
 
     def emit_syscall(opcode)
@@ -224,11 +287,14 @@ class Assembler
     end
 
 #+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+= DISPATCHER +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
     def method_missing(name, *args)
         instr = INSTRUCTIONS[name]
         if instr
             begin
-                instr[:proc].call(*args)
+                binary = instance_exec(*args, &instr[:proc])
+                @code << binary
+                binary
             rescue ArgumentError => e
                 raise ArgumentError, "#{name} failed: #{e.message}"
             end
