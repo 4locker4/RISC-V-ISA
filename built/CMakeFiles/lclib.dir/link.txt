@@ -1,0 +1,2 @@
+/usr/bin/ar qc liblclib.a CMakeFiles/lclib.dir/CppInterp/src/Interpr.cpp.o
+/usr/bin/ranlib liblclib.a

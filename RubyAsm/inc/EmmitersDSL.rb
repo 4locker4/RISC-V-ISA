@@ -46,16 +46,16 @@ class Assembler
         add: { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b011010) } },
         sub: { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b011111) } },
         movz: { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b000100) } },
-        selc: { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b000011) } },
+        selc: { proc: ->(rd, rs1, rs2) { emit_r_type(rd, rs, rt, 0b000011) } },
         rbit: { proc: ->(rd, rs) { emit_r_type(rd, rs, 0, 0b011101) } },
 
         # i-types instructions
         st: { proc: ->(rt, addr) { emit_i_type_ld_st(rt, addr, 0b100101) } },
+        ld: { proc: ->(rt, addr) { emit_i_type_ld_st(rt, addr, 0b100011) } },
         stp: { proc: ->(rt1, rt2, addr) { emit_i_stp(rt1, rt2, addr, 0b111001) } },
         beq: { proc: ->(rs, rt, offset) { emit_i_beq(rs, rt, offset, 0b010011) } },
         slti: { proc: ->(rs, rt, imm) { emit_i_type_slti(rs, rt, imm, 0b111011) } },
         usat: { proc: ->(rd, rs, imm5) { emit_i_type_rori_usat(rd, rs, imm5, 0b100010) } },
-        ld: { proc: ->(rt, addr) { emit_i_type_ld_st(rt, addr, 0b100011) } },
         rori: { proc: ->(rd, rs, imm5) { emit_i_type_rori_usat(rd, rs, imm5, 0b001100) } },
 
         # j-types instructions
@@ -71,12 +71,12 @@ class Assembler
         validate_reg(rt) if rt != 0
       
         instr = (
-            (0 << 26)  |      # funct
-            (rs << 21) |      # rs
-            (rt << 16) |      # rt (может быть 0)
-            (rd << 11) |      # rd
-            (0 << 6)   |      # shamt = 0
-            funct             # funct
+            (0 << 26)  |
+            (rs << 21) |
+            (rt << 16) |
+            (rd << 11) | 
+            (0 << 6)   |
+            funct
         )
         
         puts "R-Type Instruction:"
@@ -84,11 +84,11 @@ class Assembler
         puts "rs:        #{rs.to_s(2).rjust(5, '0')} (#{rs})"
         puts "rt:        #{rt.to_s(2).rjust(5, '0')} (#{rt})"
         puts "rd:        #{rd.to_s(2).rjust(5, '0')} (#{rd})"
-        puts "bytes:     #{[instr].pack('N').bytes.map { |b| "%08b" % b }.join(' ')}"
+        puts "bytes:     #{[instr].pack('V').bytes.map { |b| "%08b" % b }.join(' ')}"
         puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
         puts "-" * 40
 
-        [instr].pack('N')
+        [instr].pack('V')
     end
 
     def emit_i_beq(rs, rt, offset, opcode)
@@ -113,11 +113,11 @@ class Assembler
         puts "rs:        #{rs.to_s(2).rjust(5, '0')} (#{rs})"
         puts "rt:        #{rt.to_s(2).rjust(5, '0')} (#{rt})"
         puts "imm16:     #{imm16.to_s(2).rjust(16, '0')} (#{imm16})"
-        puts "bytes:     #{[instr].pack('N').bytes.map { |b| "%08b" % b }.join(' ')}"
+        puts "bytes:     #{[instr].pack('V').bytes.map { |b| "%08b" % b }.join(' ')}"
         puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
         puts "-" * 40
 
-        [instr].pack('N')
+        [instr].pack('V')
     end
 
     def emit_i_stp(rt1, rt2, address, opcode)
@@ -142,11 +142,11 @@ class Assembler
         puts "rt1:       #{rt1.to_s(2).rjust(5, '0')} (#{rt1})"
         puts "rt2:       #{rt2.to_s(2).rjust(5, '0')} (#{rt2})"
         puts "imm11:     #{imm11.to_s(2).rjust(11, '0')} (#{imm11})"
-        puts "bytes:     #{[instr].pack('N').bytes.map { |b| "%08b" % b }.join(' ')}"
+        puts "bytes:     #{[instr].pack('V').bytes.map { |b| "%08b" % b }.join(' ')}"
         puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
         puts "-" * 40
 
-        [instr].pack('N')
+        [instr].pack('V')
 
     end
 
@@ -173,11 +173,11 @@ class Assembler
         puts "addr.base: #{address.base.to_s(2).rjust(5, '0')} (#{address.base})"
         puts "rt:        #{rt.to_s(2).rjust(5, '0')} (#{rt})"
         puts "imm16:     #{imm16.to_s(2).rjust(16, '0')} (#{imm16})"
-        puts "bytes:     #{[instr].pack('N').bytes.map { |b| "%08b" % b }.join(' ')}"
+        puts "bytes:     #{[instr].pack('V').bytes.map { |b| "%08b" % b }.join(' ')}"
         puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
         puts "-" * 40
       
-        [instr].pack('N')
+        [instr].pack('V')
     end
 
     def emit_i_type_slti(rs, rt, imm, opcode)
@@ -198,11 +198,11 @@ class Assembler
         puts "rs:        #{rs.to_s(2).rjust(5, '0')} (#{rs})"
         puts "rt:        #{rt.to_s(2).rjust(5, '0')} (#{rt})"
         puts "imm16:     #{imm16.to_s(2).rjust(16, '0')} (#{imm16})"
-        puts "bytes:     #{[instr].pack('N').bytes.map { |b| "%08b" % b }.join(' ')}"
+        puts "bytes:     #{[instr].pack('V').bytes.map { |b| "%08b" % b }.join(' ')}"
         puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
         puts "-" * 40
       
-        [instr].pack('N')
+        [instr].pack('V')
     end
     
     def emit_i_type_rori_usat(rd, rs, imm5, opcode)
@@ -227,11 +227,11 @@ class Assembler
         puts "rd:        #{rd.to_s(2).rjust(5, '0')} (#{rd})"
         puts "rs:        #{rs.to_s(2).rjust(5, '0')} (#{rs})"
         puts "imm5:      #{imm5.to_s(2).rjust(5, '0')} (#{imm5})"
-        puts "bytes:     #{[instr].pack('N').bytes.map { |b| "%08b" % b }.join(' ')}"
+        puts "bytes:     #{[instr].pack('V').bytes.map { |b| "%08b" % b }.join(' ')}"
         puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
         puts "-" * 40
 
-        [instr].pack('N')
+        [instr].pack('V')
     end
 
     def emit_j_type(address, opcode)
@@ -248,16 +248,16 @@ class Assembler
         puts "J-Type Instruction:"
         puts "opcode:    #{opcode.to_s(2).rjust(6, '0')} (#{opcode})"
         puts "imm26:     #{imm26.to_s(2).rjust(26, '0')} (#{imm26})"
-        puts "bytes:     #{[instr].pack('N').bytes.map { |b| "%08b" % b }.join(' ')}"
+        puts "bytes:     #{[instr].pack('V').bytes.map { |b| "%08b" % b }.join(' ')}"
         puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
         puts "-" * 40
 
-        [instr].pack('N')
+        [instr].pack('V')
 
     end
 
     def emit_syscall(opcode)
-        [opcode].pack('N')          # Create binary
+        [opcode].pack('V')          # Create binary
     end
 #+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+= START SUPPORTING FUNCTS +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
 
