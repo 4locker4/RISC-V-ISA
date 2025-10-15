@@ -96,6 +96,7 @@ CMakeFiles/lclib.dir/CppInterp/src/Interpr.cpp.o: /home/meshok_moshonok/VS_Code/
   /usr/include/c++/13/cstdint \
   /usr/include/c++/13/cstdio \
   /usr/include/c++/13/cstdlib \
+  /usr/include/c++/13/cstring \
   /usr/include/c++/13/ctime \
   /usr/include/c++/13/cwchar \
   /usr/include/c++/13/cwctype \
@@ -146,6 +147,8 @@ CMakeFiles/lclib.dir/CppInterp/src/Interpr.cpp.o: /home/meshok_moshonok/VS_Code/
   /usr/include/stdint.h \
   /usr/include/stdio.h \
   /usr/include/stdlib.h \
+  /usr/include/string.h \
+  /usr/include/strings.h \
   /usr/include/time.h \
   /usr/include/wchar.h \
   /usr/include/wctype.h \
@@ -257,8 +260,6 @@ CMakeFiles/lclib.dir/CppInterp/src/Interpr.cpp.o: /home/meshok_moshonok/VS_Code/
 
 /usr/include/x86_64-linux-gnu/c++/13/bits/c++io.h:
 
-/usr/include/x86_64-linux-gnu/c++/13/bits/basic_file.h:
-
 /usr/include/x86_64-linux-gnu/c++/13/bits/atomic_word.h:
 
 /usr/include/x86_64-linux-gnu/bits/waitstatus.h:
@@ -298,8 +299,6 @@ CMakeFiles/lclib.dir/CppInterp/src/Interpr.cpp.o: /home/meshok_moshonok/VS_Code/
 /usr/include/x86_64-linux-gnu/bits/timesize.h:
 
 /usr/include/x86_64-linux-gnu/bits/time.h:
-
-/usr/include/x86_64-linux-gnu/bits/struct_rwlock.h:
 
 /usr/include/x86_64-linux-gnu/bits/struct_mutex.h:
 
@@ -346,6 +345,14 @@ CMakeFiles/lclib.dir/CppInterp/src/Interpr.cpp.o: /home/meshok_moshonok/VS_Code/
 /usr/include/x86_64-linux-gnu/bits/types/struct_timeval.h:
 
 /usr/include/x86_64-linux-gnu/asm/errno.h:
+
+/usr/include/x86_64-linux-gnu/bits/struct_rwlock.h:
+
+/usr/include/strings.h:
+
+/usr/include/x86_64-linux-gnu/c++/13/bits/basic_file.h:
+
+/usr/include/string.h:
 
 /usr/include/stdlib.h:
 
@@ -646,6 +653,8 @@ CMakeFiles/lclib.dir/CppInterp/src/Interpr.cpp.o: /home/meshok_moshonok/VS_Code/
 /usr/include/c++/13/bits/charconv.h:
 
 /usr/include/c++/13/cstdio:
+
+/usr/include/c++/13/cstring:
 
 /usr/include/c++/13/ctime:
 
