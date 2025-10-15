@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/InterprProg.dir/CppInterp/src/Interpr.cpp.o -o InterprProg  liblclib.a 

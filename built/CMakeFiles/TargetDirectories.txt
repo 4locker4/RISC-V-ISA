@@ -1,4 +1,0 @@
-/home/meshok_moshonok/VS_Code/Interpretator/built/CMakeFiles/lclib.dir
-/home/meshok_moshonok/VS_Code/Interpretator/built/CMakeFiles/InterprProg.a.dir
-/home/meshok_moshonok/VS_Code/Interpretator/built/CMakeFiles/edit_cache.dir
-/home/meshok_moshonok/VS_Code/Interpretator/built/CMakeFiles/rebuild_cache.dir
