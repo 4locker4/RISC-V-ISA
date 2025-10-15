@@ -1,5 +1,3 @@
-# TD добавить в emit_xxx_type проверку, что нет взаимодействия с нулевым регистром
-# TD добавить обработку 31го регистра РС
 
 # =+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=  ADDRESS FOR OFFSET.BASE =+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+= 
 class Address
@@ -15,8 +13,9 @@ end
 class Integer
     def method_missing(name, *args)
         if args.empty? && name.to_s.match?(/^x(\d+)$/)
-            reg_num = Regexp.last_match(1).to_i
-            return Address.new(self, reg_num) if (0..31).include?(reg_num)
+            match_result = name.to_s.match(/^x(\d+)$/)
+            reg_num = match_result[1].to_i
+            return Address.new(self, reg_num) if (1..30).include?(reg_num)
         end
 
         super
@@ -33,6 +32,9 @@ class Assembler
 
     def initialize
         @code = ''.b
+        @labels = {}
+        @pending_fixups = []
+        @current_address = 0
 
         (0..31).each do |i|                                 # Creating registers
             self.class.send(:define_method, "x#{i}") { i }
@@ -46,7 +48,7 @@ class Assembler
         add: { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b011010) } },
         sub: { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b011111) } },
         movz: { proc: ->(rd, rs, rt) { emit_r_type(rd, rs, rt, 0b000100) } },
-        selc: { proc: ->(rd, rs1, rs2) { emit_r_type(rd, rs, rt, 0b000011) } },
+        selc: { proc: ->(rd, rs1, rs2) { emit_r_type(rd, rs1, rs2, 0b000011) } },
         rbit: { proc: ->(rd, rs) { emit_r_type(rd, rs, 0, 0b011101) } },
 
         # i-types instructions
@@ -62,7 +64,7 @@ class Assembler
         j: { proc: ->(addr) { emit_j_type(addr, 0b010110) } },
 
         # syscall
-        syscall: { proc: -> { emit_r_type(0, 0, 0, 0b011001) } }
+        syscall: { proc: -> { emit_syscall(0b011001) } }
     }.freeze
 
     def emit_r_type(rd, rs, rt, funct)
@@ -88,13 +90,14 @@ class Assembler
         puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
         puts "-" * 40
 
+        @current_address += 4;
         [instr].pack('V')
     end
 
     def emit_i_beq(rs, rt, offset, opcode)
         validate_reg(rt)
         validate_reg(rs)
-        unless offset % 4 == 0
+        unless (offset % 4) == 0
             raise ArgumentError, "BEQ offset must be word-aligned (multiple of 4), got #{offset}"
         end
         
@@ -117,6 +120,7 @@ class Assembler
         puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
         puts "-" * 40
 
+        @current_address += 4;
         [instr].pack('V')
     end
 
@@ -146,6 +150,7 @@ class Assembler
         puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
         puts "-" * 40
 
+        @current_address += 4;
         [instr].pack('V')
 
     end
@@ -168,7 +173,7 @@ class Assembler
             (imm16 & 0xFFFF)
         )
 
-        puts "I-Type Instruction SLTI:"
+        puts "I-Type Instruction SLTI or LD:"
         puts "opcode:    #{opcode.to_s(2).rjust(6, '0')} (#{opcode})"
         puts "addr.base: #{address.base.to_s(2).rjust(5, '0')} (#{address.base})"
         puts "rt:        #{rt.to_s(2).rjust(5, '0')} (#{rt})"
@@ -177,6 +182,7 @@ class Assembler
         puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
         puts "-" * 40
       
+        @current_address += 4;
         [instr].pack('V')
     end
 
@@ -202,6 +208,7 @@ class Assembler
         puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
         puts "-" * 40
       
+        @current_address += 4;
         [instr].pack('V')
     end
     
@@ -231,6 +238,7 @@ class Assembler
         puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
         puts "-" * 40
 
+        @current_address += 4;
         [instr].pack('V')
     end
 
@@ -252,11 +260,12 @@ class Assembler
         puts "hex:       0x#{instr.to_s(16).rjust(8, '0').upcase}"
         puts "-" * 40
 
+        @current_address += 4;
         [instr].pack('V')
-
     end
 
     def emit_syscall(opcode)
+        @current_address += 4;
         [opcode].pack('V')          # Create binary
     end
 #+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+= START SUPPORTING FUNCTS +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
@@ -283,18 +292,40 @@ class Assembler
 
 # Checking validity of register
     def validate_reg(r)
-        raise ArgumentError, "Register must be 0..31, got #{r}"unless r.is_a?(Integer) && (0..31).include?(r)
+        raise ArgumentError, "Register must be 1..30, got #{r}"unless r.is_a?(Integer) && (1..30).include?(r)
     end
 
 #+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+= DISPATCHER +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
 
     def method_missing(name, *args)
+        if args.empty? && !INSTRUCTIONS.key?(name)
+            @labels[name] = @current_address
+            apply_pending_labels(name)
+            return
+        end
         instr = INSTRUCTIONS[name]
         if instr
             begin
-                binary = instance_exec(*args, &instr[:proc])
-                @code << binary
-                binary
+                processed_args = args.map do |arg|
+                    if arg.is_a?(Symbol) && @labels.key?(arg)
+                        @labels[arg]
+                    elsif arg.is_a?(String) && @labels.key?(arg.to_sym)
+                        @labels[arg.to_sym]
+                    else
+                        arg
+                    end
+                end
+            
+                case name
+                when :j
+                    handle_jmp(*processed_args)
+                when :beq
+                    handle_branch(*processed_args)
+                else
+                    binary = instance_exec(*processed_args, &instr[:proc])
+                    @code << binary
+                    binary
+                end
             rescue ArgumentError => e
                 raise ArgumentError, "#{name} failed: #{e.message}"
             end
@@ -303,8 +334,103 @@ class Assembler
         end
     end
 
+    def handle_jmp (target)
+        if target.is_a?(Symbol)
+            @pending_fixups << {
+                type: :j,
+                address: @current_address,
+                target_label: target
+            }
+
+            instr = ((0b010110 << 26) | 0)
+            @code << [instr].pack('V')
+            @current_address += 4
+        else
+            @code << emit_j_type(target, 0b010110)
+        end
+    end
+
+    def handle_branch(rs, rt, target)
+        if target.is_a?(Symbol)
+            @pending_fixups << {
+                type: :branch,
+                address: @current_address,
+                rs: rs,
+                rt: rt,
+                target_label: target
+            }
+            instr = (
+                (0b010011 << 26) | 
+                (rs       << 21) | 
+                (rt       << 16) | 
+                0)
+            @code << [instr].pack('V')
+            @current_address += 4
+        else
+            @code << emit_i_beq(rs, rt, target, 0b010011)
+        end
+    end
+    
+    def apply_pending_labels(label_name)
+        @pending_fixups.reject! do |fixup|
+            if fixup[:target_label] == label_name
+                target_addr = @labels[label_name]
+    
+                case fixup[:type]
+                when :j
+                    instr = ((0b010110 << 26) | 
+                            ((target_addr >> 2) & 0x3FFFFFF))
+                    @code[fixup[:address], 4] = [instr].pack('V')
+                when :branch
+                    offset = (target_addr - fixup[:address]) / 4
+                    imm16 = encode_immediate(offset, 16, signed: true)
+                    instr = ((0b010011  << 26) |
+                            (fixup[:rs] << 21) | 
+                            (fixup[:rt] << 16) | 
+                            (imm16 & 0xFFFF))
+                    @code[fixup[:address], 4] = [instr].pack('V')
+                end
+                true
+            else
+                false
+            end
+        end
+    end
+
+    def resolve_labels
+        @pending_fixups.each do |fixup|
+            target_addr = @labels[fixup[:target_label]]
+            if target_addr.nil?
+                raise ArgumentError, "Label #{fixup[:target_label]} not found"
+            end
+    
+            case fixup[:type]
+            when :j
+                instr = (
+                    (0b010110 << 26) | 
+                    ((target_addr >> 2) & 0x3FFFFFF))
+                @code[fixup[:address], 4] = [instr].pack('V')
+            when :branch
+                offset = (target_addr - fixup[:address]) / 4
+                imm16 = encode_immediate(offset, 16, signed: true)
+                instr = ((0b010011  << 26) | 
+                        (fixup[:rs] << 21) | 
+                        (fixup[:rt] << 16) | 
+                        (imm16 & 0xFFFF))
+                @code[fixup[:address], 4] = [instr].pack('V')
+            end
+        end
+    end
+    
+    def get_code
+        resolve_labels
+        @code
+    end
+
+    public :get_code
+
     def respond_to_missing?(name, include_private = false)
-        INSTRUCTIONS.key?(name) || super
+        name.to_s.end_with?(':') || INSTRUCTIONS.key?(name) || super
     end
 end
 
@@ -313,5 +439,5 @@ end
 def assemble(&block)
     asm = Assembler.new
     asm.instance_eval(&block)
-    asm.code
-end    
+    asm.get_code
+end

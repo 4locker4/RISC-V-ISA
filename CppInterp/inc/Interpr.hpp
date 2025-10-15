@@ -17,11 +17,14 @@
 #define DUMP_COMMAND(cmd, type)
 #endif
 
-typedef std::uint32_t command_t;
-typedef std::uint32_t reg_t;
+typedef std::int32_t command_t;
+typedef std::int32_t reg_t;
 typedef int32_t addr_t;
 
 static const reg_t EXIT = 93;
+static const reg_t N_REGISTERS = 32;
+static const reg_t N_MEM = 1024;
+
 /* Суть
    
    Мы закидываем в интерпретатор команды в бинарном виде
@@ -61,9 +64,9 @@ static const reg_t EXIT = 93;
 class Interpretator{
    std::string file_n;
    
-   reg_t registers[32] = {0};
+   reg_t registers[N_REGISTERS] = {0};
    reg_t &pc = registers[31];
-   std::int8_t   memory[1024]  = {0};
+   std::int32_t   memory[N_MEM]  = {0};
    std::unordered_map<command_t, std::function<void(command_t &cmd)>> command_table {
       {0b011010, [this](command_t &cmd) { ExecuteADD  (cmd); }},
       {0b011111, [this](command_t &cmd) { ExecuteSUB  (cmd); }},
@@ -120,6 +123,8 @@ class Interpretator{
 
       registers[rd] = registers[rs] + registers[rt];
 
+      pc += 4;
+
       return;
    }
 
@@ -131,6 +136,8 @@ class Interpretator{
       reg_t rd = (cmd >> 11) & 0b11111;
 
       registers[rd] = registers[rs] - registers[rt];
+
+      pc += 4;
 
       return;
    }
@@ -145,6 +152,8 @@ class Interpretator{
       if (registers[rt] == 0)
          registers[rd] = registers[rs];
 
+      pc += 4;
+
       return;
    }
 
@@ -156,6 +165,8 @@ class Interpretator{
       reg_t rd = (cmd >> 11) & 0b11111;
 
       registers[rd] = (registers[rs1] > registers[rs2]) ? registers[rs1] : registers[rs2];
+
+      pc += 4;
 
       return;
    }
@@ -172,6 +183,9 @@ class Interpretator{
       x = ((x & 0xF0F0F0F0) >> 4) | ((x & 0x0F0F0F0F) << 4);
       x = ((x & 0xFF00FF00) >> 8) | ((x & 0x00FF00FF) << 8);
       registers[rd] = (x >> 16) | (x << 16);
+
+      pc += 4;
+
       return;
    }
 
@@ -182,7 +196,10 @@ class Interpretator{
       reg_t rt = (cmd >> 16) & 0b11111;
       int offs_imm16 = static_cast<int16_t>(cmd & 0xFFFF);
 
-      memory[registers[base] + offs_imm16] = registers[rt];
+      memory[(registers[base] + offs_imm16) / 4] = registers[rt];
+
+      pc += 4;
+
       return;
    }
 
@@ -194,9 +211,11 @@ class Interpretator{
       reg_t rt2 = (cmd >> 11) & 0b11111;
       addr_t offs_imm11 = static_cast<int16_t>(cmd & 0x7FF);
 
-      addr_t addr = registers[base] + offs_imm11;
+      addr_t addr = (registers[base] + offs_imm11) / 4;
       memory[addr] = rt1;
-      memory[addr + 4] = rt2;
+      memory[addr + 1] = rt2;
+
+      pc += 4;
 
       return;
    }
@@ -204,19 +223,22 @@ class Interpretator{
    void ExecuteSLTI(command_t &cmd) {
       DUMP_COMMAND(cmd, "I-Type");
 
-      reg_t rs = (cmd >> 25) & 0b11111;
-      reg_t rt = (cmd >> 20) & 0b11111;
+      reg_t rs = (cmd >> 21) & 0b11111;
+      reg_t rt = (cmd >> 16) & 0b11111;
       addr_t imm = static_cast<int16_t>(cmd & 0xFFFF); // 16-битное знаковое
   
       registers[rt] = (registers[rs] < imm) ? 1 : 0;
+
+      pc += 4;
+
       return;
   }
 
   void ExecuteBEQ(command_t &cmd) {
       DUMP_COMMAND(cmd, "I-Type");
 
-      reg_t rs = (cmd >> 25) & 0b11111;
-      reg_t rt = (cmd >> 20) & 0b11111;
+      reg_t rs = (cmd >> 21) & 0b11111;
+      reg_t rt = (cmd >> 16) & 0b11111;
       addr_t offset = static_cast<int16_t>(cmd & 0xFFFF);
 
       addr_t target = offset << 2;
@@ -232,8 +254,8 @@ class Interpretator{
    void ExecuteUSAT(command_t &cmd) {
       DUMP_COMMAND(cmd, "I-Type");
 
-      reg_t rd = (cmd >> 25) & 0b11111;
-      reg_t rs = (cmd >> 20) & 0b11111;
+      reg_t rd = (cmd >> 21) & 0b11111;
+      reg_t rs = (cmd >> 16) & 0b11111;
       uint8_t imm5 = (cmd >> 11) & 0b11111;
 
       if (imm5 == 0) 
@@ -243,14 +265,17 @@ class Interpretator{
            uint32_t val = registers[rs];
            registers[rd] = (val > max_val) ? max_val : val;
       }
+
+      pc += 4;
+
       return;
    }
 
    void ExecuteRORI(command_t &cmd) {
       DUMP_COMMAND(cmd, "I-Type");
 
-      reg_t rd = (cmd >> 25) & 0b11111;
-      reg_t rs = (cmd >> 20) & 0b11111;
+      reg_t rd = (cmd >> 21) & 0b11111;
+      reg_t rs = (cmd >> 16) & 0b11111;
       uint8_t imm5 = (cmd >> 11) & 0b11111;
   
       uint32_t val = registers[rs];
@@ -260,6 +285,8 @@ class Interpretator{
       else 
          registers[rd] = val;
   
+      pc += 4;
+
       return;
   }
 
@@ -270,22 +297,26 @@ class Interpretator{
   
       // Составляем новый PC: старшие 4 бита текущего PC + index + 0b00
       pc = (pc & 0xF0000000) | (index << 2);
+
       return;
    }
 
   void ExecuteLD(command_t &cmd) {
       DUMP_COMMAND(cmd, "I-Type");
 
-      reg_t base = (cmd >> 25) & 0b11111;
-      reg_t rt   = (cmd >> 20) & 0b11111;
+      reg_t base = (cmd >> 21) & 0b11111;
+      reg_t rt   = (cmd >> 16) & 0b11111;
       addr_t offset = static_cast<int16_t>(cmd & 0xFFFF);
 
       if ((offset & 0b11) != 0) {
           throw std::runtime_error("LD: misaligned access (offset not word-aligned)");
       }
 
-      addr_t addr = registers[base] + offset;
+      addr_t addr = (registers[base] + offset) / 4;
       registers[rt] = memory[addr];
+
+      pc += 4;
+
       return;
    }
 
@@ -297,6 +328,8 @@ class Interpretator{
          default:
             std::runtime_error ("Syscall: enable syscall");
       }
+
+      pc += 4;
    }
 
    std::vector<command_t> commands = {0};
@@ -308,8 +341,7 @@ class Interpretator{
 
    int Run ();
 
-   int RunOneInstr ();
-   int DecodeOut ();
    int RegistersOut ();
    int MemOut ();
+   int FibanacciTest (int n_nums);
 };

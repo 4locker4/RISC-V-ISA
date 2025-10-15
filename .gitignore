@@ -1,4 +1,21 @@
-*.o
+# Build directories
+build/
+
+# IDE
+.vscode/
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.cmake
+
+# Binaries
+*.a
 *.bin
+*.exe
 *.out
-built/
+
+# Ruby output
+RubyAsm/src/outp.bin

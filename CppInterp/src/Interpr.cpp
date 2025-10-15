@@ -2,6 +2,7 @@
 #include <fstream>
 #include <stddef.h> 
 #include <utility>
+#include <cstring>
 
 static const command_t OPCODE_MASK = 0b111111;
 int main (int argc, char * argv[])
@@ -13,7 +14,11 @@ int main (int argc, char * argv[])
     }
 
     Interpretator prog (argv[1]);
-    prog.Run ();
+
+    if (! strcmp (argv[2], "-t"))
+        prog.FibanacciTest (std::stoi (argv[3]));
+    else
+        prog.Run ();
 
     return 0;
 }
@@ -34,10 +39,13 @@ int Interpretator::Run ()
     file.read(reinterpret_cast<char *> (commands.data()), file_size);
     file.close();
 
-    for (auto cmd : commands)
+    for (int i = 0; commands.size () > i; )
     {
-        std::cout << std::bitset<32>(cmd) << std::endl;
-        Decoder (cmd);
+        Decoder (commands[i]);
+
+        i = pc / 4;
+
+        std::cout << i << std::endl;
     }
 
     return 0;
@@ -50,15 +58,49 @@ int Interpretator::Decoder (command_t &command_data)
     if (!opcode) {
         std::cout << "бебебе" << std::endl;
         opcode = command_data & OPCODE_MASK;
-        std::cout << std::bitset<6>(opcode) << std::endl;
     }
-    std::cout << std::bitset<32>(command_data) << std::endl;
 
     auto do_cmd = command_table.find (opcode);
     if (do_cmd != command_table.end ())
         do_cmd->second (command_data);
     else
         throw std::runtime_error("Unknown opcode: " + std::to_string(opcode));
+
+    return 0;
+}
+
+int Interpretator::RegistersOut ()
+{
+    for (int i = 0; N_REGISTERS > i; i++)
+        std::cout << "R" << i << ": " << registers[i] << std::endl;
+
+    return 0;
+}
+
+int Interpretator::MemOut ()
+{
+    for (int i = 0; N_MEM > i; i += 8)
+    {
+        for (int j = 0; 8 > j; j++)
+            std::cout << memory[i + j] << " ";
+        std::cout << std::endl;
+    }
+
+    return 0;
+}
+
+int Interpretator::FibanacciTest (int n_nums){
+    memory[0] = n_nums;
+    memory[1] = 1;
+    memory[2] = EXIT;
+
+    MemOut ();
+    RegistersOut ();
+
+    Run ();
+
+    MemOut ();
+    RegistersOut ();
 
     return 0;
 }
