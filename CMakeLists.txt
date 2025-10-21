@@ -3,12 +3,17 @@ project("interpretator")
 
 # Указываем исходные файлы
 SET(SRCS 
-	./CppInterp/src/Interpr.cpp
+	./CppInterp/src/Execute.cpp
+	./CppInterp/src/Decode.cpp
+	./CppInterp/src/CPU.cpp
+
 )
 
 # Указываем заголовочные файлы
 set(HEADERS
-    ./CppInterp/inc/Interpr.hpp
+    ./CppInterp/inc/CPU.hpp
+    ./CppInterp/inc/Decode.hpp
+    ./CppInterp/inc/Execote.hpp
 )
 
 # Создаем библиотеку
@@ -16,9 +21,9 @@ add_library(lclib STATIC ${SRCS})
 
 # Указываем пути к заголовочным файлам
 target_include_directories(lclib PUBLIC 
-    ./CppInterp/inc
+    ./CppInterp/incinc
 )
 
-add_executable(InterprProg.a ./CppInterp/src/Interpr.cpp)
+add_executable(InterprProg.a ./CppInterp/src/CPU.cpp)
 
 target_link_libraries(InterprProg.a lclib)

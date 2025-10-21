@@ -24,7 +24,7 @@ binary = assemble do
   beq x1, x6, :end_fib
   j :start_fib
   end_fib
-  ld x7, 8.x6
+  ld x7, 8.x7
   syscall
 end
 

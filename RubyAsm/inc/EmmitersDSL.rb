@@ -101,7 +101,7 @@ class Assembler
             raise ArgumentError, "BEQ offset must be word-aligned (multiple of 4), got #{offset}"
         end
         
-        imm16 = encode_immediate(offset / 4, 16, signed: true)
+        imm16 = encode_immediate(offset, 16, signed: true)
 
     # Create binary
         instr = (
@@ -247,8 +247,9 @@ class Assembler
             raise ArgumentError, "J target must be word-aligned (multiple of 4), got #{address}"
         end
       
-        imm26 = encode_immediate(address >> 2, 26, signed: false)  # A total of 26 bits are allocated
-                                                                   # to the address, but the last 2 are 0
+        imm26 = encode_immediate(address >> 2, 26, signed: false)
+
+        puts "j target addr: #{imm26}"
     # Create binary
         instr = (opcode << 26) |    # opcode
                 (imm26 & 0x3FFFFFF) # address
@@ -364,10 +365,10 @@ class Assembler
                 (rs       << 21) | 
                 (rt       << 16) | 
                 0)
-            @code << [instr].pack('V')
-            @current_address += 4
+                @code << [instr].pack('V')
+                @current_address += 4
         else
-            @code << emit_i_beq(rs, rt, target, 0b010011)
+            @code << emit_i_beq(rs, rt, target - (@current_address + 4), 0b010011)
         end
     end
     
@@ -382,8 +383,9 @@ class Assembler
                             ((target_addr >> 2) & 0x3FFFFFF))
                     @code[fixup[:address], 4] = [instr].pack('V')
                 when :branch
-                    offset = (target_addr - fixup[:address]) / 4
+                    offset = target_addr - (fixup[:address] + 4)
                     imm16 = encode_immediate(offset, 16, signed: true)
+                    puts "Imm apply: #{imm16} #{label_name}"
                     instr = ((0b010011  << 26) |
                             (fixup[:rs] << 21) | 
                             (fixup[:rt] << 16) | 
@@ -411,11 +413,12 @@ class Assembler
                     ((target_addr >> 2) & 0x3FFFFFF))
                 @code[fixup[:address], 4] = [instr].pack('V')
             when :branch
-                offset = (target_addr - fixup[:address]) / 4
+                offset = target_addr - (fixup[:address] + 4)
                 imm16 = encode_immediate(offset, 16, signed: true)
-                instr = ((0b010011  << 26) | 
-                        (fixup[:rs] << 21) | 
-                        (fixup[:rt] << 16) | 
+                puts "Imm resolve: #{imm16} #{fixup[:label_name]}"
+                instr = ((0b010011  << 26) |
+                        (fixup[:rs] << 21) |
+                        (fixup[:rt] << 16) |
                         (imm16 & 0xFFFF))
                 @code[fixup[:address], 4] = [instr].pack('V')
             end
