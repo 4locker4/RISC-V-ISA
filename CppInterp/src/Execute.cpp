@@ -11,7 +11,7 @@ int Executor::run(){
         auto opcode = decoder.DecodeData(cpu.ReadWord(cpu.GetPC()));
         
         switch (opcode){
-            case ADD:      {ExecuteADD();   cpu.dump_registers();   break;}
+            case ADD:      {ExecuteADD();     break;}
             case SUB:      ExecuteSUB();      break;
             case MOVZ:     ExecuteMOVZ();     break;
             case SELC:     ExecuteSELC();     break;
@@ -29,12 +29,12 @@ int Executor::run(){
         }
 
         if (opcode == SYSCALL && cpu.GetReg(7) == EXIT) {
-            cpu.dump_registers();
+            cpu.DumpRegisters();
             return 0;
         }
 
         cpu.IncrPC(sizeof(command_t));
     }
-    cpu.dump_registers();
+    cpu.DumpRegisters();
     return 0;
 }

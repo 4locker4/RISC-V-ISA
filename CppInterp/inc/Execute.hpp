@@ -134,5 +134,6 @@ namespace Interpretator{
 
      int run();
      Executor(CPU &cpuCl) : cpu{cpuCl} {}
+     Executor() = delete;
    };
 } // namespace Interpretator

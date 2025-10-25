@@ -127,7 +127,7 @@ namespace Interpretator{
             }
         }
     
-        void dump_registers() const {
+        void DumpRegisters() const {
             std::cout << "CPU Registers:\n";
             for (int i = 0; i < N_REGISTERS; ++i) {
                 std::cout << "  x" << std::setw(2) << std::setfill(' ') << i 
