@@ -1,17 +1,18 @@
 #include "../inc/Execute.hpp"
 #include "../inc/Decode.hpp"
-#include "../inc/CPU.hpp"
+#include "../inc/Machine.hpp"
 
 using namespace Interpretator;
 
-int Executor::run(){
+int Executor::Execute(){
     Decoder decoder(cmd);
 
     while (true){
-        auto opcode = decoder.DecodeData(cpu.ReadWord(cpu.GetPC()));
+        auto opcode = decoder.DecodeData(mem.ReadWord(cpu.GetPC()));
         
         switch (opcode){
-            case ADD:      {ExecuteADD();     break;}
+
+            case ADD:      ExecuteADD();      cpu.DumpRegisters(); break;
             case SUB:      ExecuteSUB();      break;
             case MOVZ:     ExecuteMOVZ();     break;
             case SELC:     ExecuteSELC();     break;
@@ -24,17 +25,28 @@ int Executor::run(){
             case RORI:     ExecuteRORI();     break;
             case J:        ExecuteJ();        break;
             case LD:       ExecuteLD();       break;
-            case SYSCALL:  ExecuteSYSCALL();  break;
+
+            case SYSCALL:{
+                switch(ExecuteSYSCALL()){
+                    case CONTINUE: break;
+                    case ERROR:{
+                        cout << "UNDEFINED ERROR IN SYSCALL!" << endl;
+                        return 0;
+                    }
+                    case END_AND_PROCESS_DATA: return 0;
+                    default:{
+                        cout << "UNDEFINED SYSCALL RET" << endl;
+                        return 0;
+                    }
+                }
+            }
             default: break;
         }
-
-        if (opcode == SYSCALL && cpu.GetReg(7) == EXIT) {
-            cpu.DumpRegisters();
-            return 0;
-        }
-
-        cpu.IncrPC(sizeof(command_t));
+        
+        ChangePC(opcode);
     }
+
     cpu.DumpRegisters();
+    
     return 0;
 }

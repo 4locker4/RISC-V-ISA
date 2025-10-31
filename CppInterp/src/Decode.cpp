@@ -1,5 +1,5 @@
 #include "../inc/Decode.hpp"
-#include "../inc/CPU.hpp"
+#include "../inc/Machine.hpp"
 
 using namespace Interpretator;
 

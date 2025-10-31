@@ -15,7 +15,7 @@ class Integer
         if args.empty? && name.to_s.match?(/^x(\d+)$/)
             match_result = name.to_s.match(/^x(\d+)$/)
             reg_num = match_result[1].to_i
-            return Address.new(self, reg_num) if (1..30).include?(reg_num)
+            return Address.new(self, reg_num) if (0..31).include?(reg_num)
         end
 
         super
@@ -293,7 +293,7 @@ class Assembler
 
 # Checking validity of register
     def validate_reg(r)
-        raise ArgumentError, "Register must be 1..30, got #{r}"unless r.is_a?(Integer) && (1..30).include?(r)
+        raise ArgumentError, "Register must be 1..30, got #{r}"unless r.is_a?(Integer) && (0..31).include?(r)
     end
 
 #+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+= DISPATCHER +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=

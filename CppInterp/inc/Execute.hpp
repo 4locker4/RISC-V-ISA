@@ -3,7 +3,10 @@
 #include <stdint.h>   // for uint32_t, int32_t
 #include <iostream>   // for char_traits, basic_ostream, operator<<, basic_ios
 #include <stdexcept>  // for runtime_error
-#include "./CPU.hpp"  // for CPU, reg_t, addr_t, command_t, Command_st
+#include <sstream>    // for stringsstream
+
+#include "./Machine.hpp"  // for CPU_State, reg_t, addr_t, command_t, Command_st
+#include "./Enums.hpp"
 
 using namespace std;
 
@@ -11,7 +14,8 @@ namespace Interpretator{
    class Executor{
       Command_st cmd = {};
 
-      CPU &cpu;
+      CPU_State &cpu;
+      Memory &mem;
 
       void ExecuteADD () {
          reg_t value = cpu.GetReg(cmd.rs) + cpu.GetReg(cmd.rt);
@@ -57,15 +61,15 @@ namespace Interpretator{
          reg_t value = cpu.GetReg(cmd.rt);
          addr_t addr = base + cmd.imm;
 
-         cpu.WriteWord(addr, value);
+         mem.WriteWord(addr, value);
       }
 
       void ExecuteSTP() {
          reg_t base = cpu.GetReg(cmd.rd);
          addr_t addr = base + cmd.imm;
 
-         cpu.WriteWord(addr, cpu.GetReg(cmd.rs));
-         cpu.WriteWord(addr + sizeof(reg_t), cpu.GetReg(cmd.rt));
+         mem.WriteWord(addr, cpu.GetReg(cmd.rs));
+         mem.WriteWord(addr + sizeof(reg_t), cpu.GetReg(cmd.rt));
       }
 
       void ExecuteSLTI() {
@@ -112,7 +116,7 @@ namespace Interpretator{
       void ExecuteJ() {
          uint32_t next_pc = cpu.GetPC() + sizeof(command_t);   // MIPS arch
          reg_t target = (next_pc & 0xF0000000) | (cmd.imm << 2);
-         cpu.SetPC(target - sizeof(command_t));    // Because of we add sizeof(command_t) after execute
+         cpu.SetPC(target);
       }
 
       void ExecuteLD() {
@@ -123,17 +127,47 @@ namespace Interpretator{
          addr_t addr = base + cmd.imm;
          cout << cmd.rt << " - base; " << cmd.imm << " - imm;" << endl;
 
-         reg_t value = cpu.ReadWord(addr);
+         reg_t value = mem.ReadWord(addr);
 
          cpu.SetReg(cmd.rt, value);
       }
 
-      void ExecuteSYSCALL() {}
+      SYSCALL_RETS ExecuteSYSCALL() {
+         switch(cpu.GetReg(X7)){
+            case EXIT: return END_AND_PROCESS_DATA;
+            case TERMINAL_INPUT: TerminalInput(); return CONTINUE;
+            default: return ERROR;
+         }
+      }
+
+      void ChangePC(uint32_t opcode){
+         if (opcode == J) return;
+         else cpu.IncrPC(sizeof(command_t));
+
+         return;
+      }
+
+   void TerminalInput() {
+      string terminal_data;
+      getline(cin, terminal_data);
+      
+      stringstream ss(terminal_data);
+      vector<reg_t> numbers;
+      reg_t number;
+
+      while (ss >> number) {
+         numbers.push_back(number);
+      }
+      
+      for (int i = 0; i < numbers.size(); i++) {
+         mem.WriteWord(TERMINAL_VADDR + i * 4, numbers[i]);
+      }
+   }
 
      public:
 
-     int run();
-     Executor(CPU &cpuCl) : cpu{cpuCl} {}
+     int Execute();
+     Executor(CPU_State &cpuCl, Memory &memCl) : cpu{cpuCl}, mem(memCl) {}
      Executor() = delete;
    };
 } // namespace Interpretator

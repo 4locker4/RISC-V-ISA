@@ -6,7 +6,9 @@
 #include <iostream>   // for basic_ostream, operator<<, cout, endl, basic_ios
 #include <stdexcept>  // for runtime_error
 #include <string>     // for char_traits, allocator, basic_string, operator==
-#include "./CPU.hpp"  // for command_t, reg_t, Command_st
+#include "./Machine.hpp"  // for command_t, reg_t, Command_st
+
+#include "./Enums.hpp"
 
 using namespace std;
 
@@ -112,7 +114,7 @@ namespace Interpretator{
             cmd.imm = SignExtend(cmd_bin & 0xFFFF, 16);
     
             if ((cmd.imm & 0b11) != 0) {
-            throw runtime_error("LD: misaligned access (offset not word-aligned)");
+                throw runtime_error("LD: misaligned access (offset not word-aligned)");
             }
         }
     

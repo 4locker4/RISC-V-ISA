@@ -12,8 +12,9 @@ end
 # x6 - counter
 # x7 = 0 - for cond
 binary = assemble do
-  ld x1, 0.x3
-  ld x2, 4.x3
+  syscall
+  ld x1, 0x10.x3
+  ld x2, 0x14.x3
   add x4, x2, x3
   beq x1, x6, :end_fib
   start_fib
@@ -24,7 +25,7 @@ binary = assemble do
   beq x1, x6, :end_fib
   j :start_fib
   end_fib
-  ld x7, 8.x7
+  ld x7, 0x18.x7
   syscall
 end
 
