@@ -17,5 +17,7 @@ Makefile
 *.exe
 *.out
 
+!./Tests/Fibonacci.bin
+
 # Ruby output
 RubyAsm/src/outp.bin
